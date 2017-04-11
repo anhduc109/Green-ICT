@@ -1,0 +1,269 @@
+<%@ Page Language="C#" AutoEventWireup="true" CodeBehind="GreenICT.aspx.cs" Inherits="Green_ICT.Green_ICT" %>
+
+<!DOCTYPE html>
+
+<%@ Import Namespace="System.IO" %>
+<%@ Import Namespace="System.Net" %>
+<%@ Import Namespace="System.Xml" %>
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+    <head>
+	    <link rel="stylesheet" href="style.css">
+	    <style>
+	        @import url('https://fonts.googleapis.com/css?family=Droid+Sans');
+                table {
+                          border: 1px solid black;
+                      }
+                th, td {
+                          border: 1px solid black;
+                          width :4%;
+                }
+	    </style>
+        <title>The Company</title>
+    </head>
+		    <header>
+			    <nav>
+				    The company
+			    </nav>
+		    </header>
+		    <div class="container">
+			    <form class="" runat="server" action="GreenICT.aspx" method="post">
+				    <label for="tasks">Tasks:</label>
+				    <input type="text" name="taskName" id="tasks"/>
+				    <label for="hours">Hours:</label>
+				    <input type="text" name="taskHour" id="hours"/>
+				    <label for="splitable">Splitable</label>
+				    <input type="text" name="taskSplit" id="splitable"/>
+				    <br/>
+				    <input class="submit-btn" type="submit" value="Submit"/>
+			    </form>
+		    </div>
+<body>
+
+    <h1>The Company</h1>
+    <div class="workSpace">
+        <%
+            //Extract Database:  
+
+            StringWriter databaseWriter = new StringWriter();
+            WebRequest myRequest = WebRequest.Create(@"http://www.nordpoolspot.com/api/marketdata/page/10?");
+            WebResponse databaseResponse = myRequest.GetResponse();
+
+            Stream dataStream = databaseResponse.GetResponseStream();
+            StreamReader reader = new StreamReader(dataStream);
+            string database = reader.ReadToEnd();
+
+            string[] columns = database.Split('[');
+            int i, j, k = 0;
+            string[] value = new string[25];
+            char[] arrayValue = new char[5];
+            string[] smallerArray = new string[24];
+
+            for (i = 2; i < 27; i++)
+            {
+                smallerArray = columns[i].Split('"');
+                j = 0;
+                while (j < (smallerArray.Length - 1))
+                {
+                    if (smallerArray[j] == "FI")
+                    {
+                        value[k] = smallerArray[j + 4];
+                        k++;
+                        break;
+                    }
+                    j++;
+                }
+            }
+
+            double[] doubleValue = new double[24];
+            for (i = 0; i < 24; i++)
+            {
+                doubleValue[i] = Double.Parse(value[i]);
+                //Response.Write(doubleValue[i] + " ");
+            }
+            Response.Write("<br/>");
+            //Handle input from user
+
+            if (Request.Form.Count != 0)
+            {
+                string taskName = Convert.ToString(Request["taskName"]);
+                string[] taskNameArray = taskName.Split('/');
+
+                string taskHour = Convert.ToString(Request["taskHour"]);
+                string[] taskHourStringArray = taskHour.Split('/');
+                double[] taskHourDoubleArray = new double[taskHourStringArray.Length];
+
+                for (i = 0; i < taskHourDoubleArray.Length; i++)
+                {
+                    taskHourDoubleArray[i] = Double.Parse(taskHourStringArray[i]);
+                }
+                string taskSplit = Convert.ToString(Request["taskSplit"]);
+                string[] taskSplitArray = taskSplit.Split('/');
+
+                for (i = 0; i < taskNameArray.Length; i++) // Testing
+                {
+                    Response.Write(taskNameArray[i] + " : " + taskHourDoubleArray[i] + "Hours, " + taskSplitArray[i] + "<br/>");
+                }
+
+                //Logic part:
+
+                int m = 0, count = 0; j = 0;
+                for (i = 0; i < taskSplitArray.Length; i++)
+                {
+                    if (taskSplitArray[i] == "0") //Count number of unsplittable tasks
+                    {
+                        count++;
+                    }
+                }
+                int[] name = new int[count];
+                //Making the unsplittable task array:
+
+                double[] maxUnSplit = new double[count];
+
+                for (i = 0; i < count; i++)
+                {
+                    maxUnSplit[i] = 0;
+                }
+
+                for (i = 0; i < count; i++) //Number of unsplittable tasks
+                {
+                    for (j = 0; j < taskSplitArray.Length; j++) //Select the unsplittable tasks
+                    {
+                        if (taskSplitArray[j] == "0" && taskHourDoubleArray[j] != 0) //Condition of unsplittable tasks and unused tasks
+                        {
+                            if (maxUnSplit[i] <= taskHourDoubleArray[j])
+                            {
+                                maxUnSplit[i] = taskHourDoubleArray[j];
+                                name[i] = j;
+                            }
+                        }
+                    }
+                    taskHourDoubleArray[name[i]] = 0;
+                }
+                for (i = 0; i < maxUnSplit.Length; i++)
+                {
+                    Response.Write(maxUnSplit[i]);
+                }
+                //Finding the total hours for splittable hours:
+                double splitableSum = 0;
+                for (i = 0; i < taskSplitArray.Length; i++)
+                {
+                    if (taskSplitArray[i] == "1")
+                    {
+                        splitableSum += taskHourDoubleArray[i];
+                    }
+                }
+                //Arrange Unsplittable tasks:                                                                                                       
+                double temporarysum = 0, mintemporarysum;
+                int checker, l;
+                int[] unSplitPosition = new int[maxUnSplit.Length];
+
+                for (i = 0; i < maxUnSplit.Length; i++) //number of unsplitable task
+                {
+                    mintemporarysum = int.MaxValue;
+                    for (j = 0; j < (doubleValue.Length - maxUnSplit[i] + 1); j++) //scan through time table
+                    {
+                        checker = 0; temporarysum = 0;
+                        for (m = 0; m < maxUnSplit[i]; m++) //check if the hours have been used
+                        {
+                            if (doubleValue[j + m] == 0)
+                            {
+                                checker += 1;
+                            }
+                        }
+                        if (checker == 0)
+                        {
+                            for (k = 0; k < maxUnSplit[i]; k++) //calculate sum
+                            {
+                                temporarysum += doubleValue[j + k];
+                            }
+                            if (temporarysum <= mintemporarysum) //find smallest sum and store position
+                            {
+                                mintemporarysum = temporarysum;
+                                unSplitPosition[i] = j;
+                            }
+                        }
+                    }
+                    for (l = unSplitPosition[i]; l < (unSplitPosition[i] + maxUnSplit[i]); l++) //terminate choosen hour
+                    {
+                        doubleValue[l] = 0;
+                    }
+                }
+
+                //Arange the splittable tasks:
+                int[] splittablePosition = new int[(int)splitableSum];
+                double remainSmallestNumber;
+                for (i = 0; i < splitableSum; i++) //Number of splittable hours
+                {
+                    remainSmallestNumber = double.MaxValue;
+                    for (j = 0; j < doubleValue.Length; j++) //Scan through time table
+                    {
+                        if (doubleValue[j] != 0) //Skip used hours
+                        {
+                            if (doubleValue[j] < remainSmallestNumber) //Find smallest value
+                            {
+                                remainSmallestNumber = doubleValue[j];
+                                splittablePosition[i] = j;
+                            }
+                        }
+                    }
+                    doubleValue[splittablePosition[i]] = 0;
+                }
+
+                //Output result:
+                Response.Write("<br/><br/>Unsplittable tasks: <br/>");
+                for (i = 0; i < count; i++) //Unsplittable tasks
+                {
+                    Response.Write(taskNameArray[name[i]] + ": " + maxUnSplit[i] + " hours <br/>");
+                    Response.Write("Work time: " + unSplitPosition[i] + " to " + (unSplitPosition[i] + maxUnSplit[i]) + "<br/>");
+                }
+                Response.Write("<br/>Splittable tasks: <br/>"); //Splittable tasks
+                double b = 0;
+                for (i = 0; i < taskNameArray.Length; i++)
+                {
+                    if (taskSplitArray[i] == "1")
+                    {
+                        Response.Write(taskNameArray[i] + ": ");
+                        for (j = 0; j < taskHourDoubleArray[i]; j++) // Task length
+                        {
+                            Response.Write(splittablePosition[(int)(b + j)] + " ");
+                        }
+                        b += taskHourDoubleArray[i];
+                    }
+                }
+
+                // Real Output:
+                Response.Write("<br/>");
+                Response.Write("<table style='width: 90%;'>");
+                Response.Write("<tr><th>Time</th>");
+                for (i = 0;i < 24; i++)
+                {
+                    Response.Write("<td>" + i + "-" + (i + 1) + "</td>");
+                }
+                Response.Write("</tr>");
+
+                for (i = 0; i < name.Length; i++) // Unsplittable tasks
+                {
+                    Response.Write("<tr><th>" + taskNameArray[name[i]] + "</th>");
+                    for (j = 0; j < (25 - maxUnSplit[i]); j++)
+                    {
+                        if (j == unSplitPosition[i]) // Find the position
+                        {
+                            for (k = 0; k < maxUnSplit[i]; k++)
+                            {
+                                Response.Write("<td style='background-color: red;'></td>");
+                            }
+                        }
+                        else
+                        {
+                            Response.Write("<td></td>");
+                        }
+                    }
+                    Response.Write("</tr>");
+                }
+                Response.Write("</table>");
+            }
+        %>
+    </div>
+</body>
+</html>
