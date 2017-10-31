@@ -1,0 +1,151 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.IO;
+using MySql.Data.MySqlClient;
+
+namespace DatabaseTest
+{
+    public class DatabaseConnectors
+    {
+        private string myConnectionString;
+        private MySqlConnection connection;
+        private MySqlCommand command;
+
+        public DatabaseConnectors(string databaseName)
+        {
+            myConnectionString = "Server=localhost;Database=" + databaseName + ";Uid=Tom2lua;Pwd=Hexastudio123;";
+            connection = new MySqlConnection(myConnectionString);
+            command = connection.CreateCommand();
+        }
+        public void OpenConnection()
+        {
+            try
+            {
+                connection.Open();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+            }
+        }
+        public void CloseConnection()
+        {
+            connection.Close();
+        }
+        public void ModifySpecificData(string userCommand, string table, string column, string id) //Output one specific item in a table
+        {
+            command.CommandText = userCommand + " " + column + " FROM " + table + " WHERE " + table + "_id = " + id;
+            //SELECT statements:
+            try
+            {
+                OpenConnection();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+            }
+            MySqlDataReader dataReader = command.ExecuteReader();
+
+            while (dataReader.Read())
+            {
+                Console.Write(dataReader[column].ToString() + "    ");
+            }
+            CloseConnection();
+        }
+        public string[] GetSpecificData(string table, string column, string whereStatement, bool distinct)
+        {
+            string[] values = new string[100];
+            int i = 0;
+            command.CommandText = "SELECT " + column + " FROM " + table + " WHERE " + whereStatement;
+
+            OpenConnection();
+            MySqlDataReader dataReader = command.ExecuteReader();
+            while (dataReader.Read())
+            {
+                values[i] = dataReader[column].ToString();
+                i++;
+            }
+            CloseConnection();
+            return values;
+        }
+        public void OutputAllDataFromOneTable(string table, string[] column, string[] id)
+        {
+            for (int i = 0; i < id.Length; i++) //Row
+            {
+                for (int k = 0; k < column.Length; k++) //Column
+                {
+                    ModifySpecificData("SELECT", table, column[k], id[i]);
+                }
+                Console.WriteLine();
+            }
+        }
+        public string GetMaxID(string table)
+        {
+            command.CommandText = "SELECT MAX(" + table + "_id) FROM " + table;
+            OpenConnection();
+            MySqlDataReader reader = command.ExecuteReader();
+            string column = "MAX(" + table + "_id)";
+            while (reader.Read())
+            {
+                return reader[column].ToString();
+            }
+            connection.Close();
+            return "";
+        }
+        public void AddUser(string username, string password, string realName, string email)
+        {
+            command.CommandText = "INSERT INTO user(username, password, real_name, email) VALUES('" + username + "', '" + password + "', '" + realName + "', '" + email + "')";
+
+            OpenConnection();
+            command.ExecuteNonQuery();
+            CloseConnection();
+        }
+        public void ChangeRole(string id, string role)
+        {
+            command.CommandText = "UPDATE user SET role = " + role + " WHERE user_id = " + id;
+
+            OpenConnection();
+            command.ExecuteNonQuery();
+            CloseConnection();
+        }
+    }
+    public class InformationSchemaTable : DatabaseConnectors
+    {
+        public InformationSchemaTable() : base("information_schema") { }
+        public string[] GetTable()
+        {
+            string[] tables = new string[5];
+            tables = GetSpecificData("COLUMNS", "TABLE_NAME", "TABLE_SCHEMA = 'green_ict_application'");
+            return tables;
+        }
+        public string[] GetColumn(string table)
+        {
+            string[] column = new string[6];
+            column = GetSpecificData("COLUMNS", "COLUMN_NAME", "TABLE_NAME = '" + table + "'");
+            return column;
+        }
+    }
+    public class Program
+    {  
+        static void OutputArray(string[] array)
+        {
+            for (int i = 0; i < array.Length; i++)
+            {
+                Console.WriteLine(array[i]);
+            }
+        }
+        static void Main(string[] args)
+        {
+            string[] tables = new string[5];
+            string[] columns = new string[6];
+            string[] id = new string[100];
+
+            InformationSchemaTable informationSchema = new InformationSchemaTable();
+            tables = informationSchema.GetTable();
+            OutputArray(tables);
+            Console.ReadLine();
+        }
+    }
+}
