@@ -7,6 +7,11 @@ using MySql.Data.MySqlClient;
 
 namespace DatabaseTest
 {
+    public static class Global
+    {
+        public static DatabaseConnectors database = new DatabaseConnectors("green_ict_application");
+        public static InformationSchema informationSchema = new InformationSchema();
+    }
     public class DatabaseConnectors
     {
         private string myConnectionString;
@@ -34,100 +39,162 @@ namespace DatabaseTest
         {
             connection.Close();
         }
-        public void ModifySpecificData(string userCommand, string table, string column, string id) //Output one specific item in a table
+        private string WhereCheck(string text, string whereStatement)
         {
-            command.CommandText = userCommand + " " + column + " FROM " + table + " WHERE " + table + "_id = " + id;
-            //SELECT statements:
-            try
+            if (whereStatement != null)
             {
-                OpenConnection();
+                text += " WHERE " + whereStatement;
             }
-            catch (Exception ex)
-            {
-                Console.WriteLine(ex.Message);
-            }
-            MySqlDataReader dataReader = command.ExecuteReader();
-
-            while (dataReader.Read())
-            {
-                Console.Write(dataReader[column].ToString() + "    ");
-            }
-            CloseConnection();
+            return text;
         }
-        public string[] GetSpecificData(string table, string column, string whereStatement, bool distinct)
+        private string SelectCommand(string type, string table, string column, string whereStatement)
         {
-            string[] values = new string[100];
-            int i = 0;
-            command.CommandText = "SELECT " + column + " FROM " + table + " WHERE " + whereStatement;
-
-            OpenConnection();
-            MySqlDataReader dataReader = command.ExecuteReader();
-            while (dataReader.Read())
+            string text = "";
+            switch (type)
             {
-                values[i] = dataReader[column].ToString();
-                i++;
+                case "S":
+                    text += "SELECT " + column + " FROM " + table;
+                    break;
+                case "SD":
+                    text += "SELECT DISTINCT " + column + " FROM " + table;
+                    break;
             }
-            CloseConnection();
-            return values;
+            text = WhereCheck(text, whereStatement);
+            return text;
         }
-        public void OutputAllDataFromOneTable(string table, string[] column, string[] id)
+        private string UpdateCommand(string table, string column, string inputData, string whereStatement)
         {
-            for (int i = 0; i < id.Length; i++) //Row
+            string text = "";
+            text = "UPDATE " + table + " SET " + column + " = " + "'" + inputData + "'";
+            text = WhereCheck(text, whereStatement);
+            return text;
+        }
+        private string InsertCommand(string table, string[] columns, string[] inputDatas)
+        {
+            string command = "INSERT INTO " + table + " (";
+            for (int i = 1; i < columns.Length - 1; i++)
             {
-                for (int k = 0; k < column.Length; k++) //Column
+                if (i != columns.Length - 2)
                 {
-                    ModifySpecificData("SELECT", table, column[k], id[i]);
+                    command += columns[i] + ", ";
                 }
-                Console.WriteLine();
+                else
+                {
+                    command += columns[i];
+                }
             }
-        }
-        public string GetMaxID(string table)
-        {
-            command.CommandText = "SELECT MAX(" + table + "_id) FROM " + table;
-            OpenConnection();
-            MySqlDataReader reader = command.ExecuteReader();
-            string column = "MAX(" + table + "_id)";
-            while (reader.Read())
+            command += ") VALUES (";
+            for (int i = 0; i < inputDatas.Length; i++)
             {
-                return reader[column].ToString();
+                if (i != inputDatas.Length - 1)
+                {
+                    command += inputDatas[i] + ", ";
+                }
+                else
+                {
+                    command += inputDatas[i];
+                }
             }
-            connection.Close();
-            return "";
+            command += ")";
+            return command;
         }
-        public void AddUser(string username, string password, string realName, string email)
+        private string DeleteCommand(string table, string whereStatement)
         {
-            command.CommandText = "INSERT INTO user(username, password, real_name, email) VALUES('" + username + "', '" + password + "', '" + realName + "', '" + email + "')";
+            string text = "DELETE FROM " + table;
+            text = WhereCheck(text, whereStatement);
+            return text;
+        }
+        public string[] Select(string type, string table, string column, string whereStatement)
+        {
+            string data = "";
+            string[] datas;
+            command.CommandText = SelectCommand(type, table, column, whereStatement);
+            OpenConnection();
+            MySqlDataReader dataReader = command.ExecuteReader();
 
+            while (dataReader.Read())
+            {
+                data += dataReader[column].ToString() + " ";
+            }
+            datas = data.Split(' ');
+            CloseConnection();
+            return datas;
+        }
+        public void Update(string table, string columns, string inputDatas, string whereStatement)
+        {
+            command.CommandText = UpdateCommand(table, columns, inputDatas, whereStatement);
             OpenConnection();
             command.ExecuteNonQuery();
             CloseConnection();
         }
-        public void ChangeRole(string id, string role)
+        public void Insert(string table, string[] columns, string[] inputDatas)
         {
-            command.CommandText = "UPDATE user SET role = " + role + " WHERE user_id = " + id;
+            command.CommandText = InsertCommand(table, columns, inputDatas);
+            OpenConnection();
+            command.ExecuteNonQuery();
+            CloseConnection();
+        }
+        public void Delete(string table, string whereStatement)
+        {
+            command.CommandText = DeleteCommand(table, whereStatement);
 
             OpenConnection();
             command.ExecuteNonQuery();
             CloseConnection();
         }
     }
-    public class InformationSchemaTable : DatabaseConnectors
+    public class InformationSchema : DatabaseConnectors
     {
-        public InformationSchemaTable() : base("information_schema") { }
+        public InformationSchema() : base("information_schema") { }
         public string[] GetTable()
         {
             string[] tables = new string[5];
-            tables = GetSpecificData("COLUMNS", "TABLE_NAME", "TABLE_SCHEMA = 'green_ict_application'");
+            tables = Select("SD", "COLUMNS", "TABLE_NAME", "TABLE_SCHEMA = 'green_ict_application'");
             return tables;
         }
         public string[] GetColumn(string table)
         {
-            string[] column = new string[6];
-            column = GetSpecificData("COLUMNS", "COLUMN_NAME", "TABLE_NAME = '" + table + "'");
-            return column;
+            string[] columns;
+            columns = Select("S" ,"COLUMNS", "COLUMN_NAME", "TABLE_NAME = '" + table + "'");
+            return columns;
         }
     }
-    public class Program
+    public class Person
+    {
+        protected int userID;
+
+        public Person(int ID)
+        {
+            userID = ID;
+        }
+    }
+    public class User : Person
+    {
+        public User(int ID) : base(ID) { }
+
+        public void UpdateProfile(string userName, string userPassword, string realName)
+        {
+            Global.database.Update("user_table", "user_name", userName, "user_id = " + userID);
+            Global.database.Update("user_table", "user_password", userPassword, "user_table_id = " + userPassword);
+            Global.database.Update("user_table", "real_name", realName, "user_table_id = " + realName);
+        }
+    }
+    public class ServicePerson : Person
+    {
+        public ServicePerson(int ID) : base(ID)
+        {
+        }
+        public void ChoosePlace() //
+        {
+
+        }
+        public void AddPlaceAndRoom(string place, string room)
+        {
+            string[] array = new string[] {userID.ToString(), place, room};
+            Global.database.Insert("appointment_place", Global.informationSchema.GetColumn("appointment_place"), array);
+        }
+    }
+    public static class Program
     {  
         static void OutputArray(string[] array)
         {
@@ -136,16 +203,31 @@ namespace DatabaseTest
                 Console.WriteLine(array[i]);
             }
         }
+        static string[] ShowServicePerson()
+        {
+            return Global.database.Select("SD", "user_table", "user_name", "role = 'Service Person'");
+        }
+        static string[] ShowPlace()
+        {
+            return Global.database.Select("SD", "appointment_place", "appointment_place", null);
+        }
+        static string[] ShowRoom(string appointmentPlace)
+        {
+            return Global.database.Select("SD", "appointment_place", "appointment_room", "appointment_place = " + appointmentPlace);
+        }
         static void Main(string[] args)
         {
             string[] tables = new string[5];
-            string[] columns = new string[6];
             string[] id = new string[100];
-
-            InformationSchemaTable informationSchema = new InformationSchemaTable();
-            tables = informationSchema.GetTable();
-            OutputArray(tables);
+            
+            OutputArray(Global.informationSchema.GetColumn("appointment"));
             Console.ReadLine();
+
+            //Console.WriteLine(informationSchema.UpdateCommand("user", "username", "nguyenTran", "user_id = 2"));
+            //string[] columns = informationSchema.GetColumn("appointment_product");
+            //string[] inputDatas = new string[] {"2", "Exchange meeting", "30", "4"};
+            //Console.WriteLine(informationSchema.InsertCommand("appointment_product", columns, inputDatas));
+            //Console.ReadLine();
         }
     }
 }
