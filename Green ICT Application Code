@@ -181,12 +181,10 @@ namespace DatabaseTest
     }
     public class ServicePerson : Person
     {
-        public ServicePerson(int ID) : base(ID)
+        public ServicePerson(int ID) : base(ID) { }
+        public void ChoosePlace()
         {
-        }
-        public void ChoosePlace() //
-        {
-
+            
         }
         public void AddPlaceAndRoom(string place, string room)
         {
